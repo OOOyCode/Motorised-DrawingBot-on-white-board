@@ -1,7 +1,8 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from algo_rdp import rdp
+from saving_trajectory import save_trajectory
+from ui import ui
 
 # Using FineCam as Webcam (index 1)
 
@@ -58,51 +59,21 @@ while True:
     else:
         prev_x, prev_y = None, None 
 
-
-    # Define UI area
-    cv2.rectangle(frame, (5, 5), (300, 350), (0, 0, 0), -1)
-
-    cv2.putText(frame, f"Mode: {mode}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(frame, f"View Mode: 'D'", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(frame, f"Draw Mode: 'W'", (10, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(frame, f"Eraser Mode: 'X'", (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(frame, f"Save: 'S'", (10, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(frame, f"Quit Mode: 'Q'", (10, 290), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    ui(frame, mode)
 
     # Combine frame + canvas
     combined = cv2.add(frame, canvas)
-
     cv2.imshow("Draw with index", combined)
 
     key = cv2.waitKey(1)
-
     # Quit
     if key == ord('q'):
         break
     
     # Save trajectory and simplified trajectory
     elif key == ord('s'):
-        if len(points) > 10:
-            simplified = rdp(points, epsilon=5)
+        save_trajectory(points, frame)
 
-            np.save("trajectory.npy", np.array(simplified))
-
-            img = np.ones((frame.shape[0], frame.shape[1], 3), dtype=np.uint8) * 255
-
-            pts = np.array(simplified, dtype=np.int32)
-            pts = pts.reshape((-1, 1, 2))
-
-            cv2.polylines(img, [pts], isClosed=False, color=(0, 0, 0), thickness=1)
-
-            cv2.imwrite("trajectory.png", img)
-
-            print("Saved trajectory.png + trajectory.npy")
-            print("Points:", len(points), "========", len(simplified))
-            print("_________________________________________________")
-
-        else:
-            print("Not enough points")
-    
     # Change mode
     elif key == ord('d'):
         mode = "view"
