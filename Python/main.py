@@ -3,23 +3,45 @@ import mediapipe as mp
 import numpy as np
 from saving_trajectory import save_trajectory
 from ui import ui
+from menu import Menu
 
-# Using FineCam as Webcam (index 1)
+user_menu = Menu()
+
+mode = user_menu.get_mode()
+settings = user_menu.get_settings()
+
+print(mode, settings)
+r = settings["color"][2]
+g = settings["color"][1]
+b = settings["color"][0]
 
 # Mediapipe
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.4)
 mp_draw = mp.solutions.drawing_utils
 
-cap = cv2.VideoCapture(1)
+try:
+    cap = cv2.VideoCapture(1)
+except:
+    cap = cv2.VideoCapture(0)
 
 # Variables
 mode = "view"
-brush_color = (255, 255, 255)
+brush_color = settings["color"]
+width = settings["width"]
 color_pressed = 0
 canvas = None
 points = []
 prev_x, prev_y = None, None
+
+def nothing(x):
+    pass
+cv2.namedWindow("Controls")
+
+cv2.createTrackbar("R", "Controls", r, 255, nothing)
+cv2.createTrackbar("G", "Controls", g, 255, nothing)
+cv2.createTrackbar("B", "Controls", b, 255, nothing)
+cv2.createTrackbar("Width", "Controls", width, 50, nothing)
 
 while True:
     ret, frame = cap.read()
@@ -32,8 +54,15 @@ while True:
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     result = hands.process(rgb)
 
-    # Define drawing area by a rectangle (370, 225) to (841, 571)
+    
     cv2.rectangle(frame, (370, 225), (841, 571), (255, 0, 0), 2)
+
+    r = cv2.getTrackbarPos("R", "Controls")
+    g = cv2.getTrackbarPos("G", "Controls")
+    b = cv2.getTrackbarPos("B", "Controls")
+    width = cv2.getTrackbarPos("Width", "Controls")
+
+    brush_color = (b, g, r)
 
     if result.multi_hand_landmarks and mode != "view":
         for hand_landmarks in result.multi_hand_landmarks:
@@ -42,14 +71,18 @@ while True:
             index = hand_landmarks.landmark[8]
             x = int(index.x * w)
             y = int(index.y * h)
+            if mode == "Trajectoire":
+                x = round(x, -1)
+                y = round(y, -1)
             print(f"Index finger: ({x}, {y})")
 
             if x < 841 and y < 571 and y > 225 and x > 370:
+                
                 if prev_x is not None and prev_y is not None:
                     if mode == "draw":
-                        cv2.line(canvas, (prev_x, prev_y), (x, y), brush_color, 5)
+                        cv2.line(canvas, (prev_x, prev_y), (x, y), brush_color,  thickness=width)
                     elif mode == "eraser":
-                        cv2.line(canvas, (prev_x, prev_y), (x, y), (0, 0, 0), 20)
+                        cv2.line(canvas, (prev_x, prev_y), (x, y), (0, 0, 0),  thickness=width)
 
                 prev_x, prev_y = x, y
                 points.append((x, y))
@@ -59,18 +92,16 @@ while True:
     else:
         prev_x, prev_y = None, None 
 
-    ui(frame, mode)
+    ui(frame, mode, r, g, b)
 
-    # Combine frame + canvas
     combined = cv2.add(frame, canvas)
     cv2.imshow("Draw with index", combined)
 
     key = cv2.waitKey(1)
-    # Quit
+    
     if key == ord('q'):
         break
     
-    # Save trajectory and simplified trajectory
     elif key == ord('s'):
         save_trajectory(points, frame)
 
@@ -82,20 +113,6 @@ while True:
     elif key == ord('x'):
         mode = "eraser"
 
-    # Change color (doesn't affect trajectory, only drawing)
-    elif key == ord('a'):
-        b_to_c = [(255, 0, 255),  # Magenta
-                  (255, 0, 0),    # Blue    
-                  (0, 255, 0),    # Green
-                  (0, 255, 255),  # Yellow
-                  (0, 0, 255)]    # Red
-        brush_color = b_to_c[color_pressed]
-        if color_pressed < len(b_to_c) - 1:
-            color_pressed += 1
-        else:
-            color_pressed = 0
-
-    # Save drawing and clear canvas
     elif key == ord('c'):
         points = []
         cv2.imwrite("drawing.png", canvas)
